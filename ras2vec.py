@@ -12,6 +12,7 @@ class Ras2vec_Converter:
         self.boundary_point = list()
         self.count = 1
         self.pixel_cnt = self.height * self.width
+        self.visited_cnt = 0
     
     def convert(self):
         for i in range(0, self.height):
@@ -88,7 +89,8 @@ class Ras2vec_Converter:
         points = list()
 
         while queue:
-            print(f'count : {self.count} / {self.pixel_cnt}')
+            print(f'count : {self.visited_cnt} / {self.pixel_cnt}, found : {self.count}')
+            self.visited_cnt += 1
             c_coord = queue.popleft()
             # print('pop : {}, last count : {}, current count : {}'.format(c_coord, len(queue), self.check[c_coord]))
             if self.check[c_coord] == 0:

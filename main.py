@@ -6,8 +6,8 @@ import fourier
 
 
 if __name__ == "__main__":
-    file_idx = 3
-    file_name = f'test{file_idx}.png'
+    file_idx = 6
+    file_name = f'test{file_idx}.jpg'
     fft_res_name = f'fft_ret{file_idx}.png'
     bfs_res_name = f'bfs_ret{file_idx}.png'
 
