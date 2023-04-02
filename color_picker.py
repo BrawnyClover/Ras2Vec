@@ -66,4 +66,11 @@ if __name__ == "__main__":
         cv2.imshow("and", bit_and_result)
         cv2.imshow("show", contour_result)
 
+        '''
+        @Todo
+        대표 색을 추출하든, 5px 단위로 이동하면서 확인하든
+        이미지 내의 각 색상에 대한 처리 결과를 하나로 합쳐서
+        최종 svg 파일을 생성
+        '''
+
     cv2.destroyAllWindows()
