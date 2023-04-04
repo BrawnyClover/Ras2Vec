@@ -21,19 +21,52 @@ def mouse_click(event, x, y, flags, param):
         cv2.setTrackbarPos("V2", "show", int(pixel[2]/10)*10+10)
         cp.get_path(cp.image[y, x])
 
+class GroupInfo:
+    def __init__(self, contours, color):
+        self.contours = contours
+        self.color = color
+
+        self.area = 0
+        for contour in contours:
+            self.area += cv2.contourArea(contour)
+    
+    def get_path_tag(self, points, color):
+        path_tag = '<path d="'
+        path_tag = path_tag + f'M{points[0][0][0]} {points[0][0][1]} '
+        for i in range(1, len(points), 1):
+            if i > len(points):
+                break
+            pt = points[i][0]
+            path_tag = path_tag + f'L{pt[0]} {pt[1]} '
+        
+        path_tag = path_tag + f'z" stroke = "rgb({color[0]},{color[1]},{color[2]})" fill="rgb({color[0]},{color[1]},{color[2]})"/>'
+        return path_tag
+    
+    def get_group_tag(self):
+        color = self.color
+        group_tag = f'<g fill="none" stroke = "rgb({color[0]},{color[1]},{color[2]})">'
+        for contour in self.contours:
+            path_tag = self.get_path_tag(contour, self.color)
+            group_tag += path_tag
+        group_tag += '</g>'
+
+        return group_tag
+
 class ColorPicker:
     
-    def __init__(self):
-        self.image = cv2.imread("test3.png")
+    def __init__(self, image_name):
+        self.image = cv2.imread(image_name)
         # self.image = cv2.resize(self.image, [500,500])
         self.image, self.colors = self.kmeans_color_quantization(self.image, clusters=32)
         self.img = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV) 
         
+        self.title = image_name.split('.')[0]
+
         # self.img[:,:,0] = cv2.equalizeHist(self.img[:,:,0])
         self.pos_x = 0
         self.pos_y = 0
         self.accumulate_result = np.zeros(self.image.shape).astype(np.uint8)
-        self.path_tags = []
+        self.groups = []
 
     def kmeans_color_quantization(self, image, clusters=8, rounds=1):
         h, w = image.shape[:2]
@@ -107,44 +140,43 @@ class ColorPicker:
 
         contours, hier = cv2.findContours(bit_and_result_gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         self.accumulate_result = cv2.drawContours(self.accumulate_result, contours, -1, [b,g,r], -1)
-        for contour in contours:
-            path_tag = self.generate_path(contour, color)
-            self.path_tags.append(path_tag)
+
+        self.groups.append(GroupInfo(contours, [r,g,b] ))
+        # for contour in contours:
+        #     path_tag = self.generate_path(contour, color)
+        #     self.path_tags.append(path_tag)
         
         # cv2.imshow("bitwise_and", bit_and_result)
         # cv2.imwrite(f"({r},{g},{b})_({h},{s},{v}).png", bit_and_result)
     
     def get_svg(self):
         for color in cp.colors:
-            cp.get_path(color)
+            self.get_path(color)
         cv2.imwrite("acc.png", cp.accumulate_result)
+        
         print("Generate SVG")
-        self.point_to_path(cp.image.shape, cp.path_tags)
-        
-    def generate_path(self, points, color):
-        path_tag = '<path d="'
-        path_tag = path_tag + f'M{points[0][0][0]} {points[0][0][1]} '
-        for i in range(1, len(points), 1):
-            if i > len(points):
-                break
-            pt = points[i][0]
-            path_tag = path_tag + f'L{pt[0]} {pt[1]} '
-        
-        path_tag = path_tag + f'z" stroke = "rgb({color[2]},{color[1]},{color[0]})" fill="rgb({color[2]},{color[1]},{color[0]})"/>'
-        return path_tag
 
-    def point_to_path(self, shape, path_tags):
-        svg_file = f'<svg height="{shape[0]}" width="{shape[1]}" id="outputsvg"  xmlns="http://www.w3.org/2000/svg"  style="transform: none;   cursor: move;" viewBox="0 0 {shape[0]} {shape[1]}">  <g fill="none" stroke="black" stroke-width="2">'
-        for path_tag in path_tags:
-            svg_file += path_tag
-        svg_file += f'</g></svg>'
+        height = self.image.shape[0]
+        width = self.image.shape[1] 
+        svg_file = f'<svg height="{height}" width="{width}" id="outputsvg"  xmlns="http://www.w3.org/2000/svg"  style="transform: none;   cursor: move;" viewBox="0 0 {height} {width}">'
+        
+        self.groups = sorted(self.groups, key=lambda group: group.area, reverse=True)
 
-        with open("output.svg", "w") as file:
+        for group in self.groups:
+            svg_file += group.get_group_tag()
+
+        svg_file += f'</svg>'
+
+        with open(f"{self.title}_output.svg", "w") as file:
             file.write(svg_file)
+        
+    
+
+        
 
 
 
-cp = ColorPicker()
+cp = ColorPicker("test4.png")
 
 if __name__ == "__main__":
     
