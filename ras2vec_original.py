@@ -2,7 +2,6 @@ import numpy as np
 from collections import deque
 import math
 import random
-import cv2
 
 class Ras2vec_Converter:
     def __init__(self, image):
@@ -13,32 +12,9 @@ class Ras2vec_Converter:
         self.boundary_point = list()
         self.count = 1
         self.pixel_cnt = self.height * self.width
+        self.visited_cnt = 0
     
-    def preprocess(self):
-        threshold = 10
-        palette = [[self.image[0, 0], [(0, 0)]]]
-        for i in range(0, self.height):
-            for j in range(0, self.width):
-
-                is_sampled = False
-                for color, coords in palette:
-                    if self.calc_dist(self.image[i, j], color) < threshold:
-                        is_sampled = True
-                        coords.append((i, j))
-                        break
-                if is_sampled is False:
-                    palette.append([self.image[i, j], [i, j]])
-        ret_val = np.zeros([self.height, self.width, 3])
-        for color, coords in palette:
-            for coord in coords:
-                ret_val[coord] = color
-        return ret_val
-        
-
     def convert(self):
-        self.image = self.preprocess()
-        cv2.imwrite("preprocess.png", self.image)
-
         for i in range(0, self.height):
             for j in range(0, self.width):
                 if self.check[i, j] == 0:
@@ -113,7 +89,8 @@ class Ras2vec_Converter:
         points = list()
 
         while queue:
-            print(f'count : {self.count} / {self.pixel_cnt}')
+            print(f'count : {self.visited_cnt} / {self.pixel_cnt}, found : {self.count}')
+            self.visited_cnt += 1
             c_coord = queue.popleft()
             # print('pop : {}, last count : {}, current count : {}'.format(c_coord, len(queue), self.check[c_coord]))
             if self.check[c_coord] == 0:
