@@ -3,6 +3,13 @@ import numpy as np
 from sklearn.cluster import KMeans
 import math
 import colorsys
+
+tester = []
+for i in range(1, 8+1):
+    tester.append(f'test{i}.png')
+
+color_count = 64
+
 def change_value(x):
         global cp
         # cp.get_path((255,255,255))
@@ -13,12 +20,12 @@ def mouse_click(event, x, y, flags, param):
         pixel = cp.img[y, x]
         cp.pos_x = y
         cp.pos_y = x
-        cv2.setTrackbarPos("H1", "show", pixel[0])
-        cv2.setTrackbarPos("H2", "show", pixel[0])
-        cv2.setTrackbarPos("S1", "show", int(pixel[1]/10)*10)
-        cv2.setTrackbarPos("S2", "show", int(pixel[1]/10)*10+10)
-        cv2.setTrackbarPos("V1", "show", int(pixel[2]/10)*10)
-        cv2.setTrackbarPos("V2", "show", int(pixel[2]/10)*10+10)
+        # cv2.setTrackbarPos("H1", "show", pixel[0])
+        # cv2.setTrackbarPos("H2", "show", pixel[0])
+        # cv2.setTrackbarPos("S1", "show", int(pixel[1]/10)*10)
+        # cv2.setTrackbarPos("S2", "show", int(pixel[1]/10)*10+10)
+        # cv2.setTrackbarPos("V1", "show", int(pixel[2]/10)*10)
+        # cv2.setTrackbarPos("V2", "show", int(pixel[2]/10)*10+10)
         cp.get_path(cp.image[y, x])
 
 class GroupInfo:
@@ -33,31 +40,62 @@ class GroupInfo:
     def get_path_tag(self, points, color):
         path_tag = '<path d="'
         path_tag = path_tag + f'M{points[0][0][0]} {points[0][0][1]} '
-        for i in range(1, len(points), 1):
+        for i in range(1, len(points), 2):
             if i > len(points):
                 break
             pt = points[i][0]
-            path_tag = path_tag + f'L{pt[0]} {pt[1]} '
+            prev_pt = points[i-1][0]
+
+            # x = (pt[0] + prev_pt[0])/2
+            # y = (pt[1] + prev_pt[1])/2
+            x = pt[0]
+            y = pt[1]
+            path_tag = path_tag + f'L{x} {y} '
         
-        path_tag = path_tag + f'z" stroke = "rgb({color[0]},{color[1]},{color[2]})" fill="rgb({color[0]},{color[1]},{color[2]})"/>'
+        path_tag = path_tag + f'z" stroke = "rgb({color[0]},{color[1]},{color[2]})" fill="rgb({color[0]},{color[1]},{color[2]})"  stroke-width="1.5"/>'
         return path_tag
     
     def get_group_tag(self):
         color = self.color
-        group_tag = f'<g fill="none" stroke = "rgb({color[0]},{color[1]},{color[2]})">'
+        group_tag = f'<g>'
         for contour in self.contours:
+            # refined_contour = self.refine(contour)
+            # refined_contour = cv2.approxPolyDP(contour, cv2.arcLength(contour, True)*0.0001, True)
             path_tag = self.get_path_tag(contour, self.color)
             group_tag += path_tag
         group_tag += '</g>'
 
         return group_tag
+    
+    def refine(self, contour):
+        ret_val = []
+        if len(contour) <= 3:
+            return contour
+        for i in range(0, int(len(contour)/3), 3):
+            pt1 = contour[i][0]
+            pt2 = contour[i+1][0]
+            # pt3 = contour[i+2][0]
+            # print(len(contour), pt1, pt2, pt3)
+            x1 = pt1[0]
+            y1 = pt1[1]
+            x2 = pt2[0]
+            y2 = pt2[1]
+            # x3 = pt3[0]
+            # y3 = pt3[1]
+
+            x = (x1+x2)/2
+            y = (y1+y2)/2
+
+            ret_val.append([[x1, y1]])
+            # print('append', (x, y))
+        return ret_val
 
 class ColorPicker:
     
     def __init__(self, image_name):
         self.image = cv2.imread(image_name)
         # self.image = cv2.resize(self.image, [500,500])
-        self.image, self.colors = self.kmeans_color_quantization(self.image, clusters=32)
+        self.image, self.colors = self.kmeans_color_quantization(self.image, clusters=color_count)
         self.img = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV) 
         
         self.title = image_name.split('.')[0]
@@ -136,9 +174,14 @@ class ColorPicker:
 
         kernel3 = np.ones((3, 3), np.uint8)
         bit_and_result = cv2.bitwise_and(self.image, self.image, mask=hsv_mask)
-        bit_and_result_gray = cv2.cvtColor(bit_and_result, cv2.COLOR_BGR2GRAY)
+        
+        bit_and_close = cv2.morphologyEx(bit_and_result, cv2.MORPH_CLOSE, kernel3)
+        # bit_and_open = cv2.morphologyEx(bit_and_close, cv2.MORPH_OPEN, kernel3)
 
-        contours, hier = cv2.findContours(bit_and_result_gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        bit_and_result_gray = cv2.cvtColor(bit_and_close, cv2.COLOR_BGR2GRAY)
+        # bit_and_result_blur = cv2.GaussianBlur(bit_and_result_gray, (0, 0), 0.01)
+
+        contours, hier = cv2.findContours(bit_and_result_gray, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
         self.accumulate_result = cv2.drawContours(self.accumulate_result, contours, -1, [b,g,r], -1)
 
         self.groups.append(GroupInfo(contours, [r,g,b] ))
@@ -150,9 +193,9 @@ class ColorPicker:
         # cv2.imwrite(f"({r},{g},{b})_({h},{s},{v}).png", bit_and_result)
     
     def get_svg(self):
-        for color in cp.colors:
+        for color in self.colors:
             self.get_path(color)
-        cv2.imwrite("acc.png", cp.accumulate_result)
+        cv2.imwrite("acc.png", self.accumulate_result)
         
         print("Generate SVG")
 
@@ -176,28 +219,11 @@ class ColorPicker:
 
 
 
-cp = ColorPicker("test4.png")
+cp = []
+for test in tester:
+    cp.append(ColorPicker(test))
 
 if __name__ == "__main__":
-    
-    cp.get_svg()
-    # cv2.namedWindow("show")
-    # cv2.namedWindow("bitwise_and")
-    # cv2.namedWindow("mask")
-    # cv2.namedWindow("acc")
-    # cv2.namedWindow("contour")
-    # cv2.createTrackbar("H1", "show", 0, 255, change_value)
-    # cv2.createTrackbar("S1", "show", 0, 255, change_value)
-    # cv2.createTrackbar("V1", "show", 0, 255, change_value)
-
-    # cv2.createTrackbar("H2", "show", 0, 255, change_value)
-    # cv2.createTrackbar("S2", "show", 0, 255, change_value)
-    # cv2.createTrackbar("V2", "show", 0, 255, change_value)
-
-    # cv2.setMouseCallback("show", mouse_click)
-    
-    # cv2.imshow("show", cp.image)
-
-    # while True:
-    #     cv2.waitKey(1)
+    for c in cp:
+        c.get_svg()
     
